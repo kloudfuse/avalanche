@@ -1,0 +1,11 @@
+metricPrefix: "comp1"
+minSamples: 10
+maxSamples: 10
+LableCount: 1
+labelCount: 2
+valueInterval: 2
+metricInterval: 4
+
+cardinalityMap:
+  51: 2
+  49: 15
