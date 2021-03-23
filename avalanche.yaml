@@ -1,11 +1,11 @@
 metricPrefix: "comp1"
-minSamples: 10
-maxSamples: 10
-LableCount: 1
-labelCount: 2
-valueInterval: 2
-metricInterval: 4
+metricCount: 10       # number of unique metrics
+labelCount: 5         # labels per metric
+valueInterval: 2      # values for metrics and labels refreshed every n seconds
+defaultCardinality: 1 # default if none is specified in the map below for a label
 
+# labels have the form "label_key_0, label_key_1 ... label_key_<labelCount>>"
 cardinalityMap:
-  51: 2
-  49: 15
+  label_key_0: 2    # Cardinality 2 for this label
+  label_key_1: 15   # Cardinality 15 for this label
+  label_key_2: 100  # Cardinality 100 for this label

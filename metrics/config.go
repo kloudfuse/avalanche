@@ -8,14 +8,13 @@ import (
 
 type Config struct {
 	MetricPrefix       string
-	MinSamples         int
-	MaxSamples         int
+	MetricCount        int
 	LabelCount         int
 	ValueInterval      int
 	MetricInterval     int
 	Port               int
 	DefaultCardinality int
-	CardinalityMap     map[int]int
+	CardinalityMap     map[string]int
 }
 
 // LoadConfigurationFromFile into a Config object from yaml file
@@ -26,6 +25,8 @@ func LoadConfigurationFromFile(file string) (Config, error) {
 	viper.SetConfigFile(file)
 	viper.SetDefault("port", "9001")
 	viper.SetDefault("defaultCardinality", "1")
+	viper.SetDefault("valueInterval", "10")
+	viper.SetDefault("metricInterval", "30")
 	viper.AutomaticEnv()
 
 	err := viper.ReadInConfig()
@@ -37,17 +38,6 @@ func LoadConfigurationFromFile(file string) (Config, error) {
 	err = viper.Unmarshal(&config)
 	if err != nil {
 		log.Fatalf("Failed to read config file")
-	}
-
-	total := 0
-	for percent, _ := range config.CardinalityMap {
-		total += percent
-	}
-	if total > 100 {
-		log.Fatal("Cardinality percentages add up to more than 100")
-	}
-	if total < 100 {
-		config.CardinalityMap[100-total] = config.DefaultCardinality
 	}
 
 	log.Println(config.CardinalityMap)
