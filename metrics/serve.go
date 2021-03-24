@@ -1,11 +1,9 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,108 +14,50 @@ import (
 
 var (
 	promRegistry = prometheus.NewRegistry() // local Registry so we don't get Go metrics, etc.
-	valGenerator = rand.New(rand.NewSource(time.Now().UnixNano()))
-	metrics      = make([]*prometheus.GaugeVec, 0)
+	metrics      = make([]Metric, 0)
 	metricsMux   = &sync.Mutex{}
 )
 
-func registerMetrics(metricCount int, metricLength int, metricCycle int, labelKeys []string) {
-	metrics = make([]*prometheus.GaugeVec, metricCount)
-	for idx := 0; idx < metricCount; idx++ {
-		gauge := prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: fmt.Sprintf("avalanche_metric_%s_%v_%v", strings.Repeat("m", metricLength), metricCycle, idx),
-			Help: "A tasty metric morsel",
-		}, append([]string{"series_id", "cycle_id"}, labelKeys...))
-		promRegistry.MustRegister(gauge)
-		metrics[idx] = gauge
+func registerMetrics(cfg Config, cycleId int) {
+	for idx := 0; idx < cfg.MetricCount; idx++ {
+		var name string
+		name = fmt.Sprintf("%s_%v", cfg.MetricPrefix, idx)
+		metric := NewMetrics(promRegistry, name, cfg.LabelCount, cfg.DefaultCardinality, cfg.CardinalityMap)
+		metric.Register(cycleId)
+		metrics = append(metrics, metric)
 	}
 }
 
 func unregisterMetrics() {
 	for _, metric := range metrics {
-		promRegistry.Unregister(metric)
+		metric.Unregister()
 	}
 }
 
-func seriesLabels(seriesID int, cycleID int, labelKeys []string, labelValues []string) prometheus.Labels {
-	labels := prometheus.Labels{
-		"series_id": fmt.Sprintf("%v", seriesID),
-		"cycle_id":  fmt.Sprintf("%v", cycleID),
-	}
-
-	for idx, key := range labelKeys {
-		labels[key] = labelValues[idx]
-	}
-
-	return labels
-}
-
-func deleteValues(labelKeys []string, labelValues []string, seriesCount int, seriesCycle int) {
+func cycleValues() {
 	for _, metric := range metrics {
-		for idx := 0; idx < seriesCount; idx++ {
-			labels := seriesLabels(idx, seriesCycle, labelKeys, labelValues)
-			metric.Delete(labels)
-		}
-	}
-}
-
-func cycleValues(labelKeys []string, labelValues []string, seriesCount int, seriesCycle int) {
-	for _, metric := range metrics {
-		for idx := 0; idx < seriesCount; idx++ {
-			labels := seriesLabels(idx, seriesCycle, labelKeys, labelValues)
-			metric.With(labels).Set(float64(valGenerator.Intn(100)))
-		}
+		metric.Publish()
 	}
 }
 
 // RunMetrics creates a set of Prometheus test series that update over time
-func RunMetrics(metricCount int, labelCount int, seriesCount int, metricLength int, labelLength int, valueInterval int, seriesInterval int, metricInterval int, constLabels []string, stop chan struct{}) (chan struct{}, error) {
-	labelKeys := make([]string, labelCount, labelCount)
-	for idx := 0; idx < labelCount; idx++ {
-		labelKeys[idx] = fmt.Sprintf("label_key_%s_%v", strings.Repeat("k", labelLength), idx)
-	}
-	labelValues := make([]string, labelCount, labelCount)
-	for idx := 0; idx < labelCount; idx++ {
-		labelValues[idx] = fmt.Sprintf("label_val_%s_%v", strings.Repeat("v", labelLength), idx)
-	}
-	for _, cLabel := range constLabels {
-		split := strings.Split(cLabel, "=")
-		if len(split) != 2 {
-			return make(chan struct{}, 1), errors.New(fmt.Sprintf("Constant label argument must have format labelName=labelValue but got %s", cLabel))
-		}
-		labelKeys = append(labelKeys, split[0])
-		labelValues = append(labelValues, split[1])
-	}
+func RunMetrics(cfg Config, stop chan struct{}) error {
+	rand.Seed(time.Now().UTC().UnixNano())
 
-	metricCycle := 0
-	seriesCycle := 0
-	registerMetrics(metricCount, metricLength, metricCycle, labelKeys)
-	cycleValues(labelKeys, labelValues, seriesCount, seriesCycle)
-	valueTick := time.NewTicker(time.Duration(valueInterval) * time.Second)
-	seriesTick := time.NewTicker(time.Duration(seriesInterval) * time.Second)
-	metricTick := time.NewTicker(time.Duration(metricInterval) * time.Second)
+	cycleId := 0
+	registerMetrics(cfg, cycleId)
+	cycleValues()
+	valueTick := time.NewTicker(time.Duration(cfg.ValueInterval) * time.Second)
+	metricTick := time.NewTicker(time.Duration(cfg.MetricInterval) * time.Second)
 	updateNotify := make(chan struct{}, 1)
 
 	go func() {
 		for tick := range valueTick.C {
-			fmt.Printf("%v: refreshing metric values\n", tick)
+			fmt.Printf("%v: refreshing values \n", tick)
 			metricsMux.Lock()
-			cycleValues(labelKeys, labelValues, seriesCount, seriesCycle)
-			metricsMux.Unlock()
-			select {
-			case updateNotify <- struct{}{}:
-			default:
-			}
-		}
-	}()
+			defer metricsMux.Unlock()
 
-	go func() {
-		for tick := range seriesTick.C {
-			fmt.Printf("%v: refreshing series cycle\n", tick)
-			metricsMux.Lock()
-			deleteValues(labelKeys, labelValues, seriesCount, seriesCycle)
-			seriesCycle++
-			cycleValues(labelKeys, labelValues, seriesCount, seriesCycle)
+			cycleValues()
 			metricsMux.Unlock()
 			select {
 			case updateNotify <- struct{}{}:
@@ -130,11 +70,12 @@ func RunMetrics(metricCount int, labelCount int, seriesCount int, metricLength i
 		for tick := range metricTick.C {
 			fmt.Printf("%v: refreshing metric cycle\n", tick)
 			metricsMux.Lock()
-			metricCycle++
+			defer metricsMux.Unlock()
+
 			unregisterMetrics()
-			registerMetrics(metricCount, metricLength, metricCycle, labelKeys)
-			cycleValues(labelKeys, labelValues, seriesCount, seriesCycle)
-			metricsMux.Unlock()
+			cycleId++
+			registerMetrics(cfg, cycleId)
+			cycleValues()
 			select {
 			case updateNotify <- struct{}{}:
 			default:
@@ -145,11 +86,10 @@ func RunMetrics(metricCount int, labelCount int, seriesCount int, metricLength i
 	go func() {
 		<-stop
 		valueTick.Stop()
-		seriesTick.Stop()
 		metricTick.Stop()
 	}()
 
-	return updateNotify, nil
+	return nil
 }
 
 // ServeMetrics serves a prometheus metrics endpoint with test series
