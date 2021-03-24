@@ -2,17 +2,16 @@ package metrics
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 type Metric struct {
-	name       string
-	labels     []string
-	labelCount int
+	name   string
+	labels []string
 
 	generators map[string]ValueGenerator
 
@@ -22,21 +21,20 @@ type Metric struct {
 	cycleId int
 }
 
-func NewMetrics(registery *prometheus.Registry, name string, labelCount int, defaultCardinality int, cardinalityMap map[string]int) Metric {
+func NewMetrics(registry *prometheus.Registry, name string, labelCount int, defaultCardinality int, cardinalityMap map[string]int) Metric {
 	var labels []string
 	for idx := 0; idx < labelCount; idx++ {
 		label := "label_key_" + strconv.Itoa(idx)
 		labels = append(labels, label)
 	}
 	var metric Metric
-	log.Printf("Creating new metric with name %s and %d labels", name, labelCount)
-	metric.labelCount = labelCount
+	log.Infof("Creating new metric with name %s and %d labels", name, labelCount)
 	metric.name = name
 	metric.labels = labels
 
 	metric.generators = makeLabelGeneratorMap(labels, defaultCardinality, cardinalityMap)
 	metric.sample = new(prometheus.GaugeVec)
-	metric.promRegistry = registery
+	metric.promRegistry = registry
 
 	return metric
 }
@@ -55,22 +53,17 @@ func makeLabelGeneratorMap(labelValues []string, defaultCardinality int, cardina
 	return labelGeneratorMap
 }
 
-func (m *Metric) Publish() ([]string, []string) {
-	var labelValues []string
-	for _, label := range m.labels {
-		labelValues = append(labelValues, m.generators[label].Generate())
-	}
+func (m *Metric) Publish() {
 	promLabels := prometheus.Labels{
 		"cycle_id": fmt.Sprintf("%v", m.cycleId),
 	}
 
-	for idx, key := range m.labels {
-		promLabels[key] = labelValues[idx]
+	for _, label := range m.labels {
+		promLabels[label] = m.generators[label].Generate()
 	}
 
 	value := float64(rand.Intn(100))
 	m.sample.With(promLabels).Set(value)
-	return m.labels, labelValues
 }
 
 func (m *Metric) Register(cycleId int) {

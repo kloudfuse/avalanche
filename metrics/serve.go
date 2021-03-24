@@ -55,6 +55,8 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 		for tick := range valueTick.C {
 			fmt.Printf("%v: refreshing values \n", tick)
 			metricsMux.Lock()
+			defer metricsMux.Unlock()
+
 			cycleValues()
 			metricsMux.Unlock()
 			select {
@@ -68,11 +70,12 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 		for tick := range metricTick.C {
 			fmt.Printf("%v: refreshing metric cycle\n", tick)
 			metricsMux.Lock()
+			defer metricsMux.Unlock()
+
 			unregisterMetrics()
 			cycleId++
 			registerMetrics(cfg, cycleId)
 			cycleValues()
-			metricsMux.Unlock()
 			select {
 			case updateNotify <- struct{}{}:
 			default:

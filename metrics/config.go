@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/viper"
 )
@@ -19,7 +19,7 @@ type Config struct {
 
 // LoadConfigurationFromFile into a Config object from yaml file
 func LoadConfigurationFromFile(file string) (Config, error) {
-	log.Println("Reading ingester configuration from ", file)
+	log.Info("Reading ingester configuration from ", file)
 	config := Config{}
 
 	viper.SetConfigFile(file)
@@ -40,6 +40,5 @@ func LoadConfigurationFromFile(file string) (Config, error) {
 		log.Fatalf("Failed to read config file")
 	}
 
-	log.Println(config.CardinalityMap)
 	return config, err
 }

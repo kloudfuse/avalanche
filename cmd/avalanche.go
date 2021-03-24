@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 
 	"github.com/open-fresh/avalanche/metrics"
@@ -33,7 +32,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Serving ur metrics at localhost:%v/metrics\n", cfg.Port)
+	log.Infof("Serving ur metrics at localhost:%v/metrics\n", cfg.Port)
 	err = metrics.ServeMetrics(cfg.Port)
 	if err != nil {
 		log.Fatal(err)
