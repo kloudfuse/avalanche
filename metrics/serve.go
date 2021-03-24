@@ -19,12 +19,14 @@ var (
 )
 
 func registerMetrics(cfg Config, cycleId int) {
-	for idx := 0; idx < cfg.MetricCount; idx++ {
-		var name string
-		name = fmt.Sprintf("%s_%v", cfg.MetricPrefix, idx)
-		metric := NewMetrics(promRegistry, name, cfg.LabelCount, cfg.DefaultCardinality, cfg.CardinalityMap)
-		metric.Register(cycleId)
-		metrics = append(metrics, metric)
+	for compIdx := 0; compIdx < cfg.ComponentCount; compIdx++ {
+		for idx := 0; idx < cfg.MetricCount; idx++ {
+			var name string
+			name = fmt.Sprintf("%s_%v_%v", cfg.MetricPrefix, compIdx, idx)
+			metric := NewMetrics(promRegistry, name, cfg.LabelCount, cfg.DefaultCardinality, cfg.CardinalityMap)
+			metric.Register(cycleId)
+			metrics = append(metrics, metric)
+		}
 	}
 }
 
