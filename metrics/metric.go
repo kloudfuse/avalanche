@@ -1,50 +1,57 @@
 package metrics
 
 import (
-	"fmt"
 	"math/rand"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
+)
+
+var (
+	promRegistry     = prometheus.NewRegistry() // local Registry so we don't get Go metrics, etc.
+	generators       map[string]ValueGenerator
+	defaultGenerator *RandomSetValueGenerator
 )
 
 type Metric struct {
-	name   string
-	labels []string
+	name       string
+	labels     []string
+	promLabels prometheus.Labels
 
-	generators map[string]ValueGenerator
-
-	sample       *prometheus.GaugeVec
-	promRegistry *prometheus.Registry
-
-	cycleId int
+	sample *prometheus.GaugeVec
 }
 
-func NewMetrics(registry *prometheus.Registry, name string, labelCount int, defaultCardinality int, cardinalityMap map[string]int) Metric {
+func InitializeMetrics(defaultCardinality int, cardinalityMap map[string]int) {
+	defaultGenerator = NewRandomSetValueGenerator(defaultCardinality)
+	generators = makeLabelGeneratorMap(defaultCardinality, cardinalityMap)
+}
+
+func NewMetrics(name string, labelCount int) *Metric {
 	var labels []string
 	for idx := 0; idx < labelCount; idx++ {
 		label := "label_key_" + strconv.Itoa(idx)
 		labels = append(labels, label)
 	}
-	var metric Metric
-	log.Infof("Creating new metric with name %s and %d labels", name, labelCount)
+	metric := new(Metric)
 	metric.name = name
 	metric.labels = labels
-
-	metric.generators = makeLabelGeneratorMap(labels, defaultCardinality, cardinalityMap)
-	metric.sample = new(prometheus.GaugeVec)
-	metric.promRegistry = registry
+	metric.promLabels = prometheus.Labels{}
+	for _, label := range metric.labels {
+		if gen, ok := generators[label]; ok {
+			metric.promLabels[label] = gen.Generate()
+		} else {
+			metric.promLabels[label] = defaultGenerator.Generate()
+		}
+	}
 
 	return metric
 }
 
-func makeLabelGeneratorMap(labelValues []string, defaultCardinality int, cardinalityMap map[string]int) map[string]ValueGenerator {
-	defaultGenerator := NewRandomSetValueGenerator(defaultCardinality)
+func makeLabelGeneratorMap(defaultCardinality int, cardinalityMap map[string]int) map[string]ValueGenerator {
 	labelGeneratorMap := make(map[string]ValueGenerator)
-	for _, label := range labelValues {
-		if val, ok := cardinalityMap[label]; ok {
-			generator := NewRandomSetValueGenerator(val)
+	for label, cardinality := range cardinalityMap {
+		if cardinality == defaultCardinality {
+			generator := NewRandomSetValueGenerator(cardinality)
 			labelGeneratorMap[label] = generator
 		} else {
 			labelGeneratorMap[label] = defaultGenerator
@@ -53,28 +60,25 @@ func makeLabelGeneratorMap(labelValues []string, defaultCardinality int, cardina
 	return labelGeneratorMap
 }
 
-func (m *Metric) Publish() {
-	promLabels := prometheus.Labels{
-		"cycle_id": fmt.Sprintf("%v", m.cycleId),
-	}
-
-	for _, label := range m.labels {
-		promLabels[label] = m.generators[label].Generate()
-	}
-
+func (m *Metric) Publish(cycleId int) {
+	m.promLabels["cycle_id"] = strconv.Itoa(cycleId)
 	value := float64(rand.Intn(100))
-	m.sample.With(promLabels).Set(value)
+	m.sample.With(m.promLabels).Set(value)
 }
 
-func (m *Metric) Register(cycleId int) {
-	m.cycleId = cycleId
+func (m *Metric) Register() {
 	m.sample = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: m.name,
 		Help: "A tasty metric morsel",
-	}, append([]string{"cycle_id"}, m.labels...))
+	}, append(m.labels, []string{"cycle_id"}...))
 	promRegistry.MustRegister(m.sample)
 }
 
 func (m *Metric) Unregister() {
 	promRegistry.Unregister(m.sample)
+	m.sample = nil
+}
+
+func (m *Metric) DeleteValues() {
+	m.sample.Delete(m.promLabels)
 }
