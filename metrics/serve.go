@@ -8,58 +8,59 @@ import (
 	"time"
 
 	"github.com/nelkinda/health-go"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
-	promRegistry = prometheus.NewRegistry() // local Registry so we don't get Go metrics, etc.
-	metrics      = make([]Metric, 0)
-	metricsMux   = &sync.Mutex{}
+	metrics    = make([]*Metric, 0)
+	metricsMux = &sync.Mutex{}
 )
 
-func registerMetrics(cfg Config, cycleId int) {
+func deleteValues() {
+	for _, metric := range metrics {
+		metric.DeleteValues()
+	}
+}
+
+func registerMetrics(cfg Config) {
+	metrics = make([]*Metric, cfg.ComponentCount*cfg.MetricCount)
+	k := 0
 	for compIdx := 0; compIdx < cfg.ComponentCount; compIdx++ {
 		for idx := 0; idx < cfg.MetricCount; idx++ {
 			var name string
 			name = fmt.Sprintf("%s_%v_%v", cfg.MetricPrefix, compIdx, idx)
-			metric := NewMetrics(promRegistry, name, cfg.LabelCount, cfg.DefaultCardinality, cfg.CardinalityMap)
-			metric.Register(cycleId)
-			metrics = append(metrics, metric)
+			metric := NewMetrics(name, cfg.LabelCount)
+			metric.Register()
+			metrics[k] = metric
+			k++
 		}
 	}
 }
 
-func unregisterMetrics() {
+func cycleValues(cycleId int) {
 	for _, metric := range metrics {
-		metric.Unregister()
-	}
-}
-
-func cycleValues() {
-	for _, metric := range metrics {
-		metric.Publish()
+		metric.Publish(cycleId)
 	}
 }
 
 // RunMetrics creates a set of Prometheus test series that update over time
 func RunMetrics(cfg Config, stop chan struct{}) error {
 	rand.Seed(time.Now().UTC().UnixNano())
+	InitializeMetrics(cfg.DefaultCardinality, cfg.CardinalityMap)
 
 	cycleId := 0
-	registerMetrics(cfg, cycleId)
-	cycleValues()
+	registerMetrics(cfg)
+	cycleValues(cycleId)
 	valueTick := time.NewTicker(time.Duration(cfg.ValueInterval) * time.Second)
-	metricTick := time.NewTicker(time.Duration(cfg.MetricInterval) * time.Second)
+	cycleTick := time.NewTicker(time.Duration(cfg.MetricInterval) * time.Second)
 	updateNotify := make(chan struct{}, 1)
 
 	go func() {
 		for tick := range valueTick.C {
-			fmt.Printf("%v: refreshing values \n", tick)
+			log.Infof("%v: refreshing values \n", tick)
 			metricsMux.Lock()
-			defer metricsMux.Unlock()
-
-			cycleValues()
+			cycleValues(cycleId)
 			metricsMux.Unlock()
 			select {
 			case updateNotify <- struct{}{}:
@@ -69,15 +70,13 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 	}()
 
 	go func() {
-		for tick := range metricTick.C {
-			fmt.Printf("%v: refreshing metric cycle\n", tick)
+		for tick := range cycleTick.C {
+			log.Infof("%v: refreshing cycle", tick)
 			metricsMux.Lock()
-			defer metricsMux.Unlock()
-
-			unregisterMetrics()
+			deleteValues()
 			cycleId++
-			registerMetrics(cfg, cycleId)
-			cycleValues()
+			cycleValues(cycleId)
+			metricsMux.Unlock()
 			select {
 			case updateNotify <- struct{}{}:
 			default:
@@ -88,7 +87,7 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 	go func() {
 		<-stop
 		valueTick.Stop()
-		metricTick.Stop()
+		cycleTick.Stop()
 	}()
 
 	return nil
