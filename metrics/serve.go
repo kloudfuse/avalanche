@@ -18,6 +18,9 @@ var (
 )
 
 func deleteValues() {
+	metricsMux.Lock()
+	defer metricsMux.Unlock()
+
 	for _, metric := range metrics {
 		metric.DeleteValues()
 	}
@@ -39,6 +42,9 @@ func registerMetrics(cfg Config) {
 }
 
 func cycleValues(cycleId int) {
+	metricsMux.Lock()
+	defer metricsMux.Unlock()
+
 	for _, metric := range metrics {
 		metric.Publish(cycleId)
 	}
@@ -59,9 +65,7 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 	go func() {
 		for tick := range valueTick.C {
 			log.Infof("%v: refreshing values \n", tick)
-			metricsMux.Lock()
 			cycleValues(cycleId)
-			metricsMux.Unlock()
 			select {
 			case updateNotify <- struct{}{}:
 			default:
@@ -72,11 +76,8 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 	go func() {
 		for tick := range cycleTick.C {
 			log.Infof("%v: refreshing cycle", tick)
-			metricsMux.Lock()
-			deleteValues()
 			cycleId++
 			cycleValues(cycleId)
-			metricsMux.Unlock()
 			select {
 			case updateNotify <- struct{}{}:
 			default:
