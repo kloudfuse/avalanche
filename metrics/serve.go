@@ -41,12 +41,15 @@ func registerMetrics(cfg Config) {
 	}
 }
 
-func cycleValues(cycleId int) {
+func cycleValues(cycleId *int, increment bool) {
 	metricsMux.Lock()
 	defer metricsMux.Unlock()
 
+	if increment {
+		(*cycleId)++
+	}
 	for _, metric := range metrics {
-		metric.Publish(cycleId)
+		metric.Publish(*cycleId)
 	}
 }
 
@@ -57,7 +60,7 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 
 	cycleId := 0
 	registerMetrics(cfg)
-	cycleValues(cycleId)
+	cycleValues(&cycleId, false)
 	valueTick := time.NewTicker(time.Duration(cfg.ValueInterval) * time.Second)
 	cycleTick := time.NewTicker(time.Duration(cfg.MetricInterval) * time.Second)
 	updateNotify := make(chan struct{}, 1)
@@ -65,7 +68,7 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 	go func() {
 		for tick := range valueTick.C {
 			log.Infof("%v: refreshing values \n", tick)
-			cycleValues(cycleId)
+			cycleValues(&cycleId, false)
 			select {
 			case updateNotify <- struct{}{}:
 			default:
@@ -76,8 +79,7 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 	go func() {
 		for tick := range cycleTick.C {
 			log.Infof("%v: refreshing cycle", tick)
-			cycleId++
-			cycleValues(cycleId)
+			cycleValues(&cycleId, true)
 			select {
 			case updateNotify <- struct{}{}:
 			default:
