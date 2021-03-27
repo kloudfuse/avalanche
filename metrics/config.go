@@ -12,7 +12,6 @@ type Config struct {
 	LabelCount         int
 	ComponentCount     int
 	ValueInterval      int
-	MetricInterval     int
 	Port               int
 	DefaultCardinality int
 	CardinalityMap     map[string]int
@@ -27,7 +26,6 @@ func LoadConfigurationFromFile(file string) (Config, error) {
 	viper.SetDefault("port", "9001")
 	viper.SetDefault("defaultCardinality", "1")
 	viper.SetDefault("valueInterval", "10")
-	viper.SetDefault("metricInterval", "30")
 	viper.SetDefault("metricCount", "1")
 	viper.AutomaticEnv()
 

@@ -62,23 +62,11 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 	registerMetrics(cfg)
 	cycleValues(&cycleId, false)
 	valueTick := time.NewTicker(time.Duration(cfg.ValueInterval) * time.Second)
-	cycleTick := time.NewTicker(time.Duration(cfg.MetricInterval) * time.Second)
 	updateNotify := make(chan struct{}, 1)
 
 	go func() {
 		for tick := range valueTick.C {
 			log.Infof("%v: refreshing values \n", tick)
-			cycleValues(&cycleId, false)
-			select {
-			case updateNotify <- struct{}{}:
-			default:
-			}
-		}
-	}()
-
-	go func() {
-		for tick := range cycleTick.C {
-			log.Infof("%v: refreshing cycle", tick)
 			cycleValues(&cycleId, true)
 			select {
 			case updateNotify <- struct{}{}:
@@ -90,7 +78,6 @@ func RunMetrics(cfg Config, stop chan struct{}) error {
 	go func() {
 		<-stop
 		valueTick.Stop()
-		cycleTick.Stop()
 	}()
 
 	return nil
