@@ -1,7 +1,38 @@
-componentCount: 50
-metricPrefix: "comp1"
-metricCount: 1000       # number of unique metrics
-labelCount: 100         # labels per metric
-valueInterval: 2      # values for metrics and labels refreshed every n seconds
+valueInterval: 2         # values for metrics and labels refreshed every n seconds
 metricInterval: 100      # values for metrics and labels refreshed every n seconds
-defaultCardinality: 100
+defaultCardinality: 100  # default cardinality for metrics
+defaultMetricCount: 5  # number of unique metrics
+numComponents: 10
+
+components:
+  - name: "postgres"
+    entities:
+      - name: "primary"
+        count: 1
+      - name: "replica"
+        count: 1
+        parent: "primary"
+  - name: "kafka"
+    entities:
+      - name: "cluster"
+        count: 1
+      - name: "broker"
+        count: 5
+        parent: "cluster"
+      - name: "replica"
+        parent: "broker"
+        count: 3
+      - name: "topic"
+        count: 4
+        parent: "cluster"
+        labelCount: 8 
+      - name: partition
+        parent: "topic"
+        count: 2
+        metricCount: 100
+        labelCount: 10 
+      - name: "jvm"
+        count: 1
+        metricCount: 100
+        labelCount: 10 
+  
