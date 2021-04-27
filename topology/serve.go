@@ -20,12 +20,13 @@ func Run(cfg Config, stop chan struct{}) error {
 	for _, comp := range cfg.Components {
 		t := BuildTopology(comp)
 		t.Intialize()
-		visitor1 := PgTopoVisitor{}
-		visitor2 := MetricTopoVisitor{}
 
 		walker := NewWalker(t)
-		walker.AddVisitor(visitor1)
-		walker.AddVisitor(visitor2)
+
+		walker.AddVisitor(PgTopoVisitor{})
+		walker.AddVisitor(MetricTopoVisitor{})
+		walker.AddVisitor(LoggingTopoVisitor{})
+
 		walkers = append(walkers, walker)
 	}
 

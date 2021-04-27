@@ -4,10 +4,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type LoggingTopoVisitor struct {
-	Name string
-}
+type LoggingTopoVisitor struct{}
 
 func (v LoggingTopoVisitor) visit(node *EntityNode, entityId string, parentId string) {
-	log.Infof("%s: Visiting node %s with id %s and parent %s", v.Name, node.GetName(), entityId, parentId)
+	e := node.MakeEntity(entityId, parentId)
+	log.Debugf("Visiting %s with id %s", node.GetName(), e.String())
 }

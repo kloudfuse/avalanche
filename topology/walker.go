@@ -35,7 +35,6 @@ func (tw *TopoWalker) WalkEntity(node *EntityNode, parentId string) {
 		for _, visitor := range tw.visitors {
 			visitor.visit(node, entityId, parentId)
 		}
-		//e := node.MakeEntity(entityId, parentId)
 
 		for _, child := range node.Children {
 			tw.WalkEntity(child, entityId)

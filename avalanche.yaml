@@ -1,17 +1,24 @@
-valueInterval: 2         # values for metrics and labels refreshed every n seconds
+valueInterval: 2        # values for metrics and labels refreshed every n seconds
 metricInterval: 100      # values for metrics and labels refreshed every n seconds
 defaultCardinality: 100  # default cardinality for metrics
-defaultMetricCount: 5  # number of unique metrics
-numComponents: 10
+defaultMetricCount: 5    # number of unique metrics
+defaultLabelCount: 5     # number of unique labels per metric
+defaultAttributeCount: 5 # number of unique attributes per entity
 
+# - Each component can have a set of entities.
+# - Entities may or may not have a parent.
+# - A child entity will have an attribute <parentname>_id=<parent_id>
+# Metrics are scoped within an entity.
 components:
-  - name: "postgres"
+  - name: "postgres"      # Component name
     entities:
-      - name: "primary"
-        count: 1
+      - name: "primary"   # Entity name
+        count: 1          # Number of instances of this entity
+        metricCount: 100  # Number of metrics emitted from this entity  (use defaultMetricCount if not specified)
+        labelCount: 8     # Number of labels per metric (use defaultLabelCount if not specified)
       - name: "replica"
         count: 1
-        parent: "primary"
+        parent: "primary" # parent of this entity
   - name: "kafka"
     entities:
       - name: "cluster"
@@ -25,7 +32,7 @@ components:
       - name: "topic"
         count: 4
         parent: "cluster"
-        labelCount: 8 
+        labelCount: 8
       - name: partition
         parent: "topic"
         count: 2

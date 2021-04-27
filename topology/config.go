@@ -35,14 +35,14 @@ type Component struct {
 }
 
 type Config struct {
-	Port                 int
-	ValueInterval        int
-	DefaultCardinality   int
-	DefaultAttrbuteCount int
-	DefaultMetricCount   int
-	DefaultLabelCount    int
-	CardinalityMap       map[string]int
-	Components           []*Component
+	Port                  int
+	ValueInterval         int
+	DefaultCardinality    int
+	DefaultAttributeCount int
+	DefaultMetricCount    int
+	DefaultLabelCount     int
+	CardinalityMap        map[string]int
+	Components            []*Component
 }
 
 // LoadConfigurationFromFile into a Config object from yaml file
@@ -79,9 +79,10 @@ func LoadConfigurationFromFile(file string) (Config, error) {
 				ecfg.LabelCount = config.DefaultLabelCount
 			}
 			if ecfg.AttributeCount == 0 {
-				ecfg.AttributeCount = config.DefaultAttrbuteCount
+				ecfg.AttributeCount = config.DefaultAttributeCount
 			}
 			log.Infof("Default metric count %d", ecfg.MetricCount)
+			log.Infof("Default attribute count %d", ecfg.AttributeCount)
 		}
 	}
 

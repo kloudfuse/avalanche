@@ -65,7 +65,8 @@ func (e *EntityNode) MakeEntity(entityIdStr string, parentId string) *topo.Entit
 	entity.Operation = topo.Entity_UPDATE
 
 	if e.Parent != nil {
-		makeAttribute(e.Parent.GetName()+"_id", parentId)
+		attr := makeAttribute(e.Parent.GetName()+"_id", parentId)
+		entity.Attributes = append(entity.Attributes, &attr)
 	}
 
 	for idx := 0; idx < e.Cfg.AttributeCount; idx++ {
