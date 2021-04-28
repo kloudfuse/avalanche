@@ -4,7 +4,7 @@ import (
 	"flag"
 	"os"
 
-	"github.com/open-fresh/avalanche/metrics"
+	"github.com/open-fresh/avalanche/topology"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,7 +18,7 @@ func main() {
 		os.Exit(-1)
 	}
 
-	cfg, err := metrics.LoadConfigurationFromFile(cfgFile)
+	cfg, err := topology.LoadConfigurationFromFile(cfgFile)
 	if err != nil {
 		log.Fatal("Failed to parse config file")
 		os.Exit(-1)
@@ -27,13 +27,12 @@ func main() {
 	stop := make(chan struct{})
 	defer close(stop)
 
-	err = metrics.RunMetrics(cfg, stop)
+	err = topology.Run(cfg, stop)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Infof("Serving ur metrics at localhost:%v/metrics\n", cfg.Port)
-	err = metrics.ServeMetrics(cfg.Port)
+	err = topology.ServeMetrics(cfg.Port)
 	if err != nil {
 		log.Fatal(err)
 	}
